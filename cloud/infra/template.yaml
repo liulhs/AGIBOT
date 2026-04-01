@@ -1,0 +1,262 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: X2 Dance Kiosk — serverless cloud infrastructure
+
+Parameters:
+  StripeSecretKey:
+    Type: String
+    NoEcho: true
+    Description: Stripe secret API key
+  StripeWebhookSecret:
+    Type: String
+    NoEcho: true
+    Description: Stripe webhook signing secret
+  StripePriceCents:
+    Type: Number
+    Default: 200
+    Description: Fixed price per dance in cents (200 = $2.00)
+  DomainName:
+    Type: String
+    Description: Custom domain (e.g. dance.example.com)
+  IoTEndpoint:
+    Type: String
+    Description: "AWS IoT Core endpoint (run: aws iot describe-endpoint --endpoint-type iot:Data-ATS)"
+
+Globals:
+  Function:
+    Runtime: python3.10
+    Timeout: 10
+    MemorySize: 128
+    Environment:
+      Variables:
+        ROBOT_STATE_TABLE: !Ref RobotStateTable
+        TRANSACTIONS_TABLE: !Ref TransactionsTable
+        IOT_ENDPOINT: !Ref IoTEndpoint
+
+Resources:
+
+  # ── DynamoDB Tables ──────────────────────────────────────
+
+  RobotStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: X2DanceKiosk-RobotState
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: robot_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: robot_id
+          KeyType: HASH
+
+  TransactionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: X2DanceKiosk-Transactions
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: transaction_id
+          AttributeType: S
+        - AttributeName: robot_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: transaction_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: robot_id-index
+          KeySchema:
+            - AttributeName: robot_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  # ── Lambda Functions ─────────────────────────────────────
+
+  CreateCheckoutFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: X2DanceKiosk-CreateCheckout
+      Handler: create_checkout.lambda_handler
+      CodeUri: ../lambdas/
+      Environment:
+        Variables:
+          STRIPE_SECRET_KEY: !Ref StripeSecretKey
+          STRIPE_PRICE_CENTS: !Ref StripePriceCents
+          DOMAIN_NAME: !Ref DomainName
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref RobotStateTable
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/checkout
+            Method: POST
+
+  HandleWebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: X2DanceKiosk-HandleWebhook
+      Handler: handle_webhook.lambda_handler
+      CodeUri: ../lambdas/
+      Environment:
+        Variables:
+          STRIPE_SECRET_KEY: !Ref StripeSecretKey
+          STRIPE_WEBHOOK_SECRET: !Ref StripeWebhookSecret
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RobotStateTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TransactionsTable
+        - Statement:
+            - Effect: Allow
+              Action: iot:Publish
+              Resource: !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/x2/*/command/*"
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/webhook/stripe
+            Method: POST
+
+  GetStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: X2DanceKiosk-GetStatus
+      Handler: get_status.lambda_handler
+      CodeUri: ../lambdas/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref RobotStateTable
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/status/{robot_id}
+            Method: GET
+
+  # ── API Gateway ──────────────────────────────────────────
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+
+  # ── IoT Rule: Status → DynamoDB ──────────────────────────
+
+  IoTStatusRule:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      RuleName: X2DanceKioskStatusToDynamo
+      TopicRulePayload:
+        Sql: "SELECT * FROM 'x2/+/status'"
+        Actions:
+          - DynamoDBv2:
+              PutItem:
+                TableName: !Ref RobotStateTable
+              RoleArn: !GetAtt IoTRuleRole.Arn
+        RuleDisabled: false
+
+  IoTRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: iot.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: IoTDynamoDBWrite
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt RobotStateTable.Arn
+
+  # ── S3 Bucket for Web SPA ───────────────────────────────
+
+  WebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "x2-dance-kiosk-web-${AWS::AccountId}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${WebBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+  # ── CloudFront ───────────────────────────────────────────
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt WebBucket.RegionalDomainName
+            OriginAccessControlId: !Ref CloudFrontOAC
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: X2DanceKioskOAC
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  WebBucketName:
+    Description: S3 bucket for web assets
+    Value: !Ref WebBucket
+  CloudFrontDomain:
+    Description: CloudFront distribution domain
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  RobotStateTableName:
+    Description: DynamoDB table for robot state
+    Value: !Ref RobotStateTable
+  TransactionsTableName:
+    Description: DynamoDB table for transactions
+    Value: !Ref TransactionsTable

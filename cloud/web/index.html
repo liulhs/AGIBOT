@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X2 Dance Kiosk</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>X2 Dance Kiosk</h1>
+            <div id="status-badge" class="badge offline">Loading...</div>
+        </header>
+
+        <main>
+            <!-- Idle: show dance menu -->
+            <section id="dance-menu" class="hidden">
+                <p class="subtitle">Pick a dance and watch the robot perform!</p>
+                <div id="dance-list" class="dance-grid"></div>
+            </section>
+
+            <!-- Dancing: show feedback -->
+            <section id="dancing-view" class="hidden">
+                <div class="dancing-animation">🤖💃</div>
+                <h2>Robot is dancing!</h2>
+                <p id="dancing-motion-name"></p>
+                <p class="subtle">Check back in a moment for another dance.</p>
+            </section>
+
+            <!-- Offline -->
+            <section id="offline-view" class="hidden">
+                <div class="offline-icon">📡</div>
+                <h2>Robot is offline</h2>
+                <p>Please try again later.</p>
+            </section>
+
+            <!-- Payment success -->
+            <section id="success-view" class="hidden">
+                <div class="success-icon">🎉</div>
+                <h2>Payment received!</h2>
+                <p>The robot is about to dance...</p>
+            </section>
+
+            <!-- Payment cancelled -->
+            <section id="cancelled-view" class="hidden">
+                <h2>Payment cancelled</h2>
+                <p>No charge was made. <a href="#" id="back-to-menu">Back to dances</a></p>
+            </section>
+
+            <!-- Error -->
+            <section id="error-view" class="hidden">
+                <h2>Something went wrong</h2>
+                <p id="error-message"></p>
+                <button id="retry-btn" class="btn">Try Again</button>
+            </section>
+        </main>
+
+        <footer>
+            <p>Powered by AgiBot X2</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
