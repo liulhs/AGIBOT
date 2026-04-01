@@ -50,7 +50,10 @@ def create_policy(robot_id: str, account: str, region: str) -> str:
             {
                 "Effect": "Allow",
                 "Action": "iot:Publish",
-                "Resource": f"arn:aws:iot:{region}:{account}:topic/x2/{robot_id}/status/*",
+                "Resource": [
+                    f"arn:aws:iot:{region}:{account}:topic/x2/{robot_id}/status",
+                    f"arn:aws:iot:{region}:{account}:topic/x2/{robot_id}/status/*",
+                ],
             },
         ],
     }

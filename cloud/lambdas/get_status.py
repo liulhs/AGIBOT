@@ -30,7 +30,7 @@ def lambda_handler(event, context):
         "robot_id": item.get("robot_id"),
         "state": item.get("state", "unknown"),
         "current_motion": item.get("current_motion"),
-        "last_updated": item.get("last_updated"),
+        "last_updated": item.get("last_updated") or item.get("timestamp"),
     })
 
 

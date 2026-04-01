@@ -229,12 +229,13 @@ def main():
         ca_filepath=ca_file,
         client_bootstrap=client_bootstrap,
         client_id=robot_id,
-        clean_session=False,
+        clean_session=True,
         keep_alive_secs=30,
         will=mqtt.Will(
-            topic=lwt_topic,
-            payload=lwt_payload.encode("utf-8"),
-            qos=mqtt.QoS.AT_LEAST_ONCE,
+            lwt_topic,
+            mqtt.QoS.AT_LEAST_ONCE,
+            lwt_payload.encode("utf-8"),
+            False,
         ),
     )
 
