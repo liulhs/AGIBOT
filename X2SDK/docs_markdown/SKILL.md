@@ -177,23 +177,26 @@ Flask REST API on port 8080 exposing motion control over HTTP.
 
 ### MQTT Client (`x2-mqtt-client.service`)
 
-AWS IoT Core MQTT client for cloud-to-robot command dispatch.
+AWS IoT Core MQTT client for cloud-to-robot command dispatch. Delegates all robot control to the local REST API on `localhost:8080` — no direct ROS2 calls, avoiding `rclpy.spin_until_future_complete` threading deadlocks.
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `mqtt_client.py` | MQTT handler | Command dispatch, state publishing, LWT |
-| `mqtt_run.sh` | Launcher | ROS2/DRP env setup, starts mqtt_client.py |
+| `mqtt_client.py` | MQTT handler | Command dispatch via REST API, state publishing, LWT |
+| `mqtt_run.sh` | Launcher | Sets env vars, starts mqtt_client.py (no ROS2 env needed) |
 | `certs/` | TLS certs | X.509 mutual TLS (cert.pem, private.key, AmazonRootCA1.pem) |
 
-**Topics:** `x2/{robot_id}/command/#` (subscribe), `x2/{robot_id}/status` (publish), `x2/{robot_id}/status/heartbeat` (publish)
+**Topics:** `x2/{robot_id}/command/#` (subscribe), `x2/{robot_id}/status` (publish)
 
 **Actions:** `play_motion`, `stop_motion`, `set_mode`, `play_preset`
 
 **Key behaviors:**
-- LWT auto-publishes `state: "offline"` on disconnect
-- Heartbeat every 30s
-- Auto-registers all LinkCraft motions at startup
-- Auto-stand option before playing motion
+- **REST API delegation:** All robot control goes through `localhost:8080` — no direct ROS2 calls
+- **Command queue:** Single worker thread processes commands and heartbeats sequentially, preventing race conditions
+- **Motion completion detection:** Polls robot state every 2s while dancing; auto-resets to `idle` when motion finishes
+- **Adaptive heartbeat:** Publishes status every 10s (idle) or 2s (dancing) to keep DynamoDB fresh
+- **LWT:** Auto-publishes `state: "offline"` on disconnect
+- **Auto-stand:** Automatically stands the robot before playing a motion if not already standing
+- **Startup wait:** Waits up to 30s for REST API to be available before connecting to MQTT
 
 ### AWS Dance Kiosk Cloud Stack
 
@@ -209,6 +212,8 @@ CloudFormation stack `X2DanceKiosk` in `us-east-2`. Source at `/Users/jasonliu/G
 | `cloud/scripts/provision_robot.py` | Script | IoT Thing + cert provisioning |
 
 **Flow:** Browser → Stripe Checkout → webhook Lambda → MQTT publish → Robot plays dance
+**If robot busy:** Auto-refunds via Stripe
+**CloudFront:** Custom error responses (403/404 → `index.html`) for SPA routing
 
 **URLs:**
 - Kiosk: `https://d3h2rdy9lq3b29.cloudfront.net`

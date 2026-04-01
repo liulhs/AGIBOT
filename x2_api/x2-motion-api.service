@@ -10,7 +10,6 @@ WorkingDirectory=/home/run/x2_api
 ExecStart=/home/run/x2_api/run.sh
 Restart=on-failure
 RestartSec=5
-Environment=X2_API_KEY=your-production-key-here
 
 [Install]
 WantedBy=multi-user.target

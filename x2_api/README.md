@@ -108,7 +108,7 @@ bash x2_api/tests/test_integration.sh http://192.168.50.227:8080
 
 # X2 MQTT Client (AWS IoT Core)
 
-MQTT client running on the X2 robot that connects to AWS IoT Core, receives dance commands from the cloud, and controls the robot via the same ROS2 bridge. Works alongside the REST API.
+MQTT client running on the X2 robot that connects to AWS IoT Core, receives dance commands from the cloud, and delegates all robot control to the local REST API on `localhost:8080`. This avoids ROS2 threading issues (`rclpy.spin_until_future_complete` deadlocks when called from MQTT callback threads).
 
 ## Architecture
 
@@ -117,10 +117,12 @@ AWS IoT Core
     │  MQTT (TLS, X.509 mutual auth)
     ▼
 mqtt_client.py (MqttCommandHandler)
+    │  HTTP to localhost:8080
+    ▼
+Flask REST API (server.py)
     │
-    ├── config.py            → MQTT topics, robot ID, cert paths
-    ├── motion_catalog.py    → YAML → friendly motion IDs
-    └── ros2_bridge.py       → rclpy service calls with retry
+    ├── ros2_bridge.py       → rclpy service calls with retry
+    └── motion_catalog.py    → YAML → friendly motion IDs
          │
          ▼  ROS2 Services
     MC (Motion Control on PC1)
@@ -132,7 +134,7 @@ mqtt_client.py (MqttCommandHandler)
 |-------|-----------|-------------|
 | `x2/{robot_id}/command/#` | Cloud → Robot | Incoming commands (play, stop, mode) |
 | `x2/{robot_id}/status` | Robot → Cloud | State updates (idle/dancing/offline) |
-| `x2/{robot_id}/status/heartbeat` | Robot → Cloud | Heartbeat every 30s |
+| `x2/{robot_id}/status` (heartbeat) | Robot → Cloud | Heartbeat every 10s (idle) or 2s (dancing) |
 
 ## Command Format
 
@@ -154,10 +156,12 @@ Supported actions: `play_motion`, `stop_motion`, `set_mode`, `play_preset`
 
 ## Features
 
-- **Last Will and Testament (LWT):** Auto-publishes `state: "offline"` if connection drops
-- **Auto-registration:** Registers all LinkCraft motions at startup
-- **Auto-stand:** Can automatically stand the robot before playing a motion
-- **Heartbeat:** Publishes state every 30 seconds
+- **REST API delegation:** All robot control goes through `localhost:8080` — no direct ROS2 calls, avoids threading deadlocks
+- **Last Will and Testament (LWT):** Auto-publishes `state: "offline"` if MQTT connection drops
+- **Auto-stand:** Automatically stands the robot before playing a motion if not already standing
+- **Motion completion detection:** Polls robot state every 2s while dancing; auto-resets to `idle` when motion finishes
+- **Adaptive heartbeat:** Publishes status every 10s (idle) or 2s (dancing) to keep DynamoDB fresh
+- **Command queue:** Single worker thread processes commands and heartbeats sequentially, preventing race conditions
 
 ## Certificates
 
@@ -175,6 +179,13 @@ Provisioned via `cloud/scripts/provision_robot.py`:
 ```bash
 python cloud/scripts/provision_robot.py x2-001 --scp
 ```
+
+## Dependencies
+
+The MQTT client requires:
+- `awsiotsdk` (AWS IoT Device SDK) — for MQTT over TLS
+- `requests` — for calling the local REST API
+- The REST API (`x2-motion-api.service`) must be running on `localhost:8080`
 
 ## Deploy to Robot
 
@@ -230,9 +241,9 @@ cd x2_api && python3 -m pytest tests/test_mqtt_client.py -v
 | File | Purpose |
 |------|---------|
 | `server.py` | Flask REST API (port 8080) |
-| `mqtt_client.py` | MQTT client for AWS IoT Core |
-| `ros2_bridge.py` | ROS2 service call wrapper with retry |
-| `motion_catalog.py` | YAML-based motion catalog |
+| `mqtt_client.py` | MQTT client for AWS IoT Core (delegates to REST API) |
+| `ros2_bridge.py` | ROS2 service call wrapper with retry (used by REST API) |
+| `motion_catalog.py` | YAML-based motion catalog (used by REST API) |
 | `config.py` | Shared configuration (REST + MQTT) |
 | `auth.py` | API key validation for REST |
 | `run.sh` | REST API launcher |
@@ -249,6 +260,7 @@ cd x2_api && python3 -m pytest tests/test_mqtt_client.py -v
 | `x2-mqtt-client.service` | enabled, active | AWS IoT Core MQTT client |
 
 Both services are set to `Restart=on-failure` and start after `agibot_software.service`.
+The MQTT client depends on the REST API — it waits up to 30s for `localhost:8080` to be available at startup.
 
 ---
 
@@ -306,8 +318,9 @@ Browser (CloudFront SPA)
 
 - **Checkout Sessions** created by Lambda with `robot_id` + `motion_id` metadata
 - **Webhook** at `/api/webhook/stripe` listens for `checkout.session.completed`
-- On successful payment: publishes MQTT command to `x2/{robot_id}/command/motion/play`
-- If robot busy: issues automatic refund
+- On successful payment: publishes MQTT command to `x2/{robot_id}/command/motion/play` with `auto_stand: true`
+- If robot busy (`state: dancing`): issues automatic refund
+- CloudFront configured with custom error responses (403/404 → `index.html`) for SPA routing
 
 ## Deploy Cloud Stack
 

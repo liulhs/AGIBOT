@@ -336,7 +336,9 @@ Two custom systemd services run at `/home/run/x2_api/`:
 | `x2-motion-api.service` | HTTP :8080 | Flask REST API for motion control | enabled, active |
 | `x2-mqtt-client.service` | MQTT (TLS) | AWS IoT Core client for cloud commands | enabled, active |
 
-Both share `ros2_bridge.py`, `motion_catalog.py`, and `config.py`.
+The REST API uses `ros2_bridge.py`, `motion_catalog.py`, and `config.py` directly. The MQTT client delegates all robot control to the REST API on `localhost:8080` (no direct ROS2 calls) — this avoids `rclpy.spin_until_future_complete` threading deadlocks. The MQTT client depends on the REST API and waits up to 30s for it at startup.
+
+**MQTT client key features:** REST API delegation, command queue (single worker thread), motion completion detection (polls state every 2s while dancing), adaptive heartbeat (10s idle / 2s dancing), LWT offline detection, auto-stand.
 
 ### WiFi / Network
 
