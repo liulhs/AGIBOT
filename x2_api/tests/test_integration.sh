@@ -9,8 +9,9 @@ PASS=0
 FAIL=0
 
 check() {
-    local desc="$1" expected_code="$2" method="$3" path="$4" body="$5"
-    local args=(-s -o /tmp/x2_resp -w "%{http_code}" -X "$method" "${HOST}${path}" -H "X-API-Key: ${KEY}" -H "Content-Type: application/json")
+    local desc="$1" expected_code="$2" method="$3" path="$4" body="$5" no_auth="$6"
+    local args=(-s -o /tmp/x2_resp -w "%{http_code}" -X "$method" "${HOST}${path}" -H "Content-Type: application/json")
+    [ -z "$no_auth" ] && args+=(-H "X-API-Key: ${KEY}")
     [ -n "$body" ] && args+=(-d "$body")
     code=$(curl "${args[@]}")
     if [ "$code" = "$expected_code" ]; then
@@ -32,7 +33,7 @@ echo
 check "Health check" 200 GET "/api/v1/health"
 
 # Auth
-check "No API key → 401" 401 GET "/api/v1/motions"
+check "No API key → 401" 401 GET "/api/v1/motions" "" "true"
 ORIG_KEY="$KEY"; KEY="wrong"
 check "Wrong API key → 403" 403 GET "/api/v1/motions"
 KEY="$ORIG_KEY"

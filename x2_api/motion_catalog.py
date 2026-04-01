@@ -5,6 +5,7 @@ Maps resource keys to human-readable IDs, generates correct tags and paths
 for the RegisterCustomMotion and SetMcMotion ROS2 services.
 """
 import re
+from typing import Optional
 import yaml
 from config import MOTION_TYPE_ANIMATION, MOTION_TYPE_MIMIC
 
@@ -34,7 +35,7 @@ class MotionCatalog:
     """Reads resource_config.yaml and builds a catalog of available LinkCraft motions."""
 
     def __init__(self, config_path: str, resource_base: str):
-        self._motions: dict[str, dict] = {}
+        self._motions = {}
         self._resource_base = resource_base
         self._load(config_path)
 
@@ -80,7 +81,7 @@ class MotionCatalog:
         """Return all motions as a list of dicts."""
         return list(self._motions.values())
 
-    def get_by_id(self, motion_id: str) -> dict | None:
+    def get_by_id(self, motion_id: str) -> Optional[dict]:
         """Look up a motion by friendly ID. Returns None if not found."""
         return self._motions.get(motion_id)
 

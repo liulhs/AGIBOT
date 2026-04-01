@@ -7,6 +7,7 @@ timeout per attempt) because ROS2 cross-host service calls are unreliable.
 """
 import threading
 import logging
+from typing import Optional
 import rclpy
 from rclpy.node import Node
 
@@ -48,7 +49,7 @@ class ROS2Bridge:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._node: Node | None = None
+        self._node: Optional[Node] = None
         self._clients: dict = {}
 
     def init(self):
@@ -81,7 +82,7 @@ class ROS2Bridge:
         if rclpy.ok():
             rclpy.shutdown()
 
-    def _call(self, client_name: str, request, label: str = "") -> object | None:
+    def _call(self, client_name: str, request, label: str = "") -> Optional[object]:
         """Call a ROS2 service with retry logic. Returns the response or None."""
         client = self._clients[client_name]
         with self._lock:
