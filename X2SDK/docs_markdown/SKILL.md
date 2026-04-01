@@ -1,6 +1,6 @@
 ---
 name: x2-aimsdk
-description: AgiBot X2 AimDK (AI Motion Development Kit) SDK reference. Use this skill whenever the user asks about the AgiBot X2 humanoid robot SDK, including motion control, joint control, locomotion, preset motions, end-effector control, voice/screen/LED interaction, sensors, power management, startup/shutdown procedures, ROS 2 interfaces, or writing Python/C++ code for the X2 robot. Trigger on any mention of AimDK, AgiBot X2, x2 robot SDK, or robot control code involving this platform.
+description: AgiBot X2 AimDK (AI Motion Development Kit) SDK reference. Use this skill whenever the user asks about the AgiBot X2 humanoid robot SDK, including motion control, joint control, locomotion, preset motions, end-effector control, voice/screen/LED interaction, sensors, power management, startup/shutdown procedures, ROS 2 interfaces, writing Python/C++ code for the X2 robot, the X2 REST API, MQTT client, AWS IoT Core connectivity, or the Dance Kiosk cloud stack. Trigger on any mention of AimDK, AgiBot X2, x2 robot SDK, robot control code, x2_api, mqtt_client, or dance kiosk involving this platform.
 ---
 
 # AimDK_X2 SDK — Claude Code Agent Skill
@@ -154,3 +154,65 @@ docs_markdown/
 - Use the SDK input-source registration pattern (see `Interface/control_mod/MC_control.md`) rather than raw topic publishing, to ensure priority-safe control.
 - Standard ROS 2 cross-host services have reliability issues; follow SDK example patterns (retransmission, exception safety) shown in `example/Python.md` and `example/Cpp.md`.
 - Data under `$HOME/aimdk*` is managed by the system — do not write user data there.
+
+---
+
+## X2 Robot Services (Deployed)
+
+The robot runs two custom services alongside the AIMDK stack. Source code is at `/Users/jasonliu/Github/AGIBOT/x2_api/`, deployed to `/home/run/x2_api/` on the robot.
+
+### REST API (`x2-motion-api.service`)
+
+Flask REST API on port 8080 exposing motion control over HTTP.
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `server.py` | Flask app, routes | HTTP endpoints for motion control |
+| `ros2_bridge.py` | ROS2 wrapper | Service calls with retry logic |
+| `motion_catalog.py` | Motion registry | YAML-based motion ID → ROS2 tag mapping |
+| `auth.py` | Authentication | API key validation |
+| `config.py` | Configuration | Shared settings (REST + MQTT) |
+
+**Endpoints:** `/api/v1/health`, `/api/v1/robot/state`, `/api/v1/motions`, `/api/v1/motions/play`, `/api/v1/motions/stop`, `/api/v1/robot/mode`, `/api/v1/presets/play`
+
+### MQTT Client (`x2-mqtt-client.service`)
+
+AWS IoT Core MQTT client for cloud-to-robot command dispatch.
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `mqtt_client.py` | MQTT handler | Command dispatch, state publishing, LWT |
+| `mqtt_run.sh` | Launcher | ROS2/DRP env setup, starts mqtt_client.py |
+| `certs/` | TLS certs | X.509 mutual TLS (cert.pem, private.key, AmazonRootCA1.pem) |
+
+**Topics:** `x2/{robot_id}/command/#` (subscribe), `x2/{robot_id}/status` (publish), `x2/{robot_id}/status/heartbeat` (publish)
+
+**Actions:** `play_motion`, `stop_motion`, `set_mode`, `play_preset`
+
+**Key behaviors:**
+- LWT auto-publishes `state: "offline"` on disconnect
+- Heartbeat every 30s
+- Auto-registers all LinkCraft motions at startup
+- Auto-stand option before playing motion
+
+### AWS Dance Kiosk Cloud Stack
+
+CloudFormation stack `X2DanceKiosk` in `us-east-2`. Source at `/Users/jasonliu/Github/AGIBOT/cloud/`.
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| `cloud/infra/template.yaml` | SAM template | Full stack definition |
+| `cloud/lambdas/create_checkout.py` | Lambda | Stripe Checkout Session creation |
+| `cloud/lambdas/handle_webhook.py` | Lambda | Stripe webhook → MQTT command |
+| `cloud/lambdas/get_status.py` | Lambda | DynamoDB → robot state |
+| `cloud/web/` | S3/CloudFront | Kiosk SPA (HTML/CSS/JS) |
+| `cloud/scripts/provision_robot.py` | Script | IoT Thing + cert provisioning |
+
+**Flow:** Browser → Stripe Checkout → webhook Lambda → MQTT publish → Robot plays dance
+
+**URLs:**
+- Kiosk: `https://d3h2rdy9lq3b29.cloudfront.net`
+- API: `https://x37qk3dqwc.execute-api.us-east-2.amazonaws.com/prod`
+- IoT: `a1thbiemoccm90-ats.iot.us-east-2.amazonaws.com`
+
+For full documentation, see `/Users/jasonliu/Github/AGIBOT/x2_api/README.md`.

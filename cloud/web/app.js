@@ -4,7 +4,7 @@
 
     // ── Config ──────────────────────────────────────────
     // API_BASE is set during deployment (relative path works with API GW + CloudFront)
-    const API_BASE = "/api";
+    const API_BASE = "https://x37qk3dqwc.execute-api.us-east-2.amazonaws.com/prod/api";
     const POLL_INTERVAL_MS = 3000;
 
     // ── State ───────────────────────────────────────────

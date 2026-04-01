@@ -11,7 +11,7 @@ ExecStart=/home/run/x2_api/mqtt_run.sh
 Restart=on-failure
 RestartSec=5
 Environment=X2_ROBOT_ID=x2-001
-Environment=X2_IOT_ENDPOINT=your-iot-endpoint.iot.us-east-1.amazonaws.com
+Environment=X2_IOT_ENDPOINT=a1thbiemoccm90-ats.iot.us-east-2.amazonaws.com
 Environment=X2_CERT_PATH=/home/run/x2_api/certs
 
 [Install]

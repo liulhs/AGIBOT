@@ -319,7 +319,37 @@ POST http://<soc0-ip>:51057/rpc/aimdk.protocol.MotionCommandService/GetMotionLis
 - **ROS2 Humble** at `/opt/ros/humble/`
 - **Flask 3.1.2** + flask-cors 6.0.2 (already installed)
 - **requests 2.25.1** (installed)
+- **awsiotsdk** (AWS IoT Device SDK, installed via pip3)
 - FastAPI/uvicorn NOT installed (can be `pip3 install --user`)
 - AimRT middleware (custom, C++ based, Python bindings via protobuf)
-- Available ports: 8000, 8080, 5000 all free
+- Available ports: 8000, 5000 free. **Port 8080 in use** by x2-motion-api.service.
 - Disk: 384GB free
+
+---
+
+## 12. Deployed Services on SoC1
+
+Two custom systemd services run at `/home/run/x2_api/`:
+
+| Service | Port/Protocol | Purpose | Status |
+|---------|---------------|---------|--------|
+| `x2-motion-api.service` | HTTP :8080 | Flask REST API for motion control | enabled, active |
+| `x2-mqtt-client.service` | MQTT (TLS) | AWS IoT Core client for cloud commands | enabled, active |
+
+Both share `ros2_bridge.py`, `motion_catalog.py`, and `config.py`.
+
+### WiFi / Network
+
+- **SSID:** `robotx 5G` (5GHz, WPA2/WPA3)
+- **WiFi IP:** `192.168.50.227` (DHCP, metric 600)
+- **5G Cellular:** `wwan0` (primary default route)
+- **Autoconnect:** `no` — WiFi managed by Agibot housekeeper (`aima nm`), does NOT auto-reconnect on reboot
+- The 5G cellular connection provides internet fallback even without WiFi
+
+### AWS IoT Core Connection
+
+- **Thing Name:** `x2-001`
+- **IoT Endpoint:** `a1thbiemoccm90-ats.iot.us-east-2.amazonaws.com`
+- **Certs:** `/home/run/x2_api/certs/` (cert.pem, private.key, AmazonRootCA1.pem)
+- **Policy:** `X2DanceKiosk-x2-001` (connect, subscribe command/*, receive command/*, publish status + status/*)
+- **Provisioned via:** `cloud/scripts/provision_robot.py x2-001 --scp`
