@@ -1,0 +1,16 @@
+[Unit]
+Description=X2 Motion REST API
+After=agibot_software.service
+Wants=agibot_software.service
+
+[Service]
+Type=simple
+User=run
+WorkingDirectory=/home/run/x2_api
+ExecStart=/home/run/x2_api/run.sh
+Restart=on-failure
+RestartSec=5
+Environment=X2_API_KEY=your-production-key-here
+
+[Install]
+WantedBy=multi-user.target
