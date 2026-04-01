@@ -1,0 +1,18 @@
+[Unit]
+Description=X2 MQTT Client (AWS IoT Core)
+After=agibot_software.service
+Wants=agibot_software.service
+
+[Service]
+Type=simple
+User=run
+WorkingDirectory=/home/run/x2_api
+ExecStart=/home/run/x2_api/mqtt_run.sh
+Restart=on-failure
+RestartSec=5
+Environment=X2_ROBOT_ID=x2-001
+Environment=X2_IOT_ENDPOINT=your-iot-endpoint.iot.us-east-1.amazonaws.com
+Environment=X2_CERT_PATH=/home/run/x2_api/certs
+
+[Install]
+WantedBy=multi-user.target

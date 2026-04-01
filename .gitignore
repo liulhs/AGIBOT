@@ -11,3 +11,13 @@ build/
 *.log
 .vscode/
 .idea/
+
+# AWS IoT certs (never commit)
+x2_api/certs/
+certs/
+
+# Environment files
+.env.*
+
+# SAM build artifacts
+cloud/infra/.aws-sam/

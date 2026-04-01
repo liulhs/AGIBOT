@@ -31,6 +31,15 @@ MOTION_TYPE_ANIMATION = 1  # CSV trajectory
 MOTION_TYPE_MIMIC = 2      # ONNX neural-net policy
 MOTION_TYPE_FOUNDATION = 3
 
+# MQTT / AWS IoT Core
+MQTT_ROBOT_ID = "x2-001"  # Override via X2_ROBOT_ID env var
+MQTT_IOT_ENDPOINT = ""     # Override via X2_IOT_ENDPOINT env var (required)
+MQTT_CERT_PATH = "/home/run/x2_api/certs"  # Override via X2_CERT_PATH env var
+MQTT_HEARTBEAT_INTERVAL_SEC = 30
+MQTT_COMMAND_TOPIC_PREFIX = "x2/{robot_id}/command"
+MQTT_STATUS_TOPIC = "x2/{robot_id}/status"
+MQTT_HEARTBEAT_TOPIC = "x2/{robot_id}/status/heartbeat"
+
 # Valid robot modes
 VALID_MODES = [
     "PASSIVE_DEFAULT",
