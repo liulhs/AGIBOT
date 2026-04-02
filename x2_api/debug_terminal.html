@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X2 Debug Terminal</title>
+<style>
+/* ---------- Reset & Variables ---------- */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #0a0a0f;
+    --surface: #16161d;
+    --surface2: #1e1e28;
+    --border: #2a2a35;
+    --text: #e8e8ed;
+    --text-subtle: #8888aa;
+    --accent: #6c5ce7;
+    --accent-light: #a29bfe;
+    --success: #00b894;
+    --success-dim: rgba(0,184,148,0.15);
+    --warning: #fdcb6e;
+    --warning-dim: rgba(253,203,110,0.15);
+    --danger: #e17055;
+    --danger-dim: rgba(225,112,85,0.15);
+    --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --radius: 8px;
+}
+
+body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.4;
+}
+
+/* ---------- Top Bar ---------- */
+.topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 16px;
+    flex-wrap: wrap;
+}
+.topbar h1 {
+    font-size: 16px; font-weight: 600;
+    font-family: var(--mono);
+    color: var(--accent-light);
+    white-space: nowrap;
+}
+.topbar .meta {
+    font-size: 12px; color: var(--text-subtle);
+    font-family: var(--mono);
+    display: flex; gap: 16px; flex-wrap: wrap;
+}
+.topbar .conn-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; margin-right: 4px;
+    background: var(--danger);
+}
+.topbar .conn-dot.ok { background: var(--success); }
+
+/* ---------- Grid Layout ---------- */
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px 20px 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.grid .full { grid-column: 1 / -1; }
+
+@media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr; }
+}
+
+/* ---------- Panels ---------- */
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.panel-header {
+    padding: 10px 14px;
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-subtle);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: default;
+}
+.panel-header.collapsible { cursor: pointer; user-select: none; }
+.panel-header .chevron { transition: transform 0.2s; }
+.panel-header.collapsed .chevron { transform: rotate(-90deg); }
+.panel-body { padding: 12px 14px; }
+.panel-body.collapsed { display: none; }
+
+/* ---------- Service Cards ---------- */
+.svc-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.svc-card {
+    flex: 1; min-width: 160px;
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 12px;
+    border: 1px solid var(--border);
+}
+.svc-card .name {
+    font-family: var(--mono); font-size: 12px;
+    font-weight: 600; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+}
+.svc-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+}
+.svc-dot.active { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.svc-dot.failed { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+.svc-dot.inactive { background: var(--text-subtle); }
+.svc-detail {
+    font-size: 11px; color: var(--text-subtle);
+    font-family: var(--mono); line-height: 1.6;
+}
+
+/* ---------- Metric Bars ---------- */
+.metric-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px; font-size: 12px; font-family: var(--mono);
+}
+.metric-row:last-child { margin-bottom: 0; }
+.metric-label { width: 60px; color: var(--text-subtle); flex-shrink: 0; text-align: right; }
+.metric-bar-wrap {
+    flex: 1; height: 16px;
+    background: var(--surface2); border-radius: 3px;
+    overflow: hidden; position: relative;
+}
+.metric-bar {
+    height: 100%; border-radius: 3px;
+    transition: width 0.5s ease;
+}
+.metric-bar.cpu { background: var(--accent); }
+.metric-bar.mem { background: #e17055; }
+.metric-bar.disk { background: #fdcb6e; }
+.metric-bar.gpu { background: var(--success); }
+.metric-val { width: 55px; text-align: right; flex-shrink: 0; }
+
+/* ---------- Temps ---------- */
+.temp-grid {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-top: 10px;
+}
+.temp-chip {
+    background: var(--surface2);
+    border-radius: 4px; padding: 4px 8px;
+    font-family: var(--mono); font-size: 11px;
+}
+.temp-chip .val { font-weight: 600; }
+.temp-chip .val.hot { color: var(--danger); }
+.temp-chip .val.warm { color: var(--warning); }
+.temp-chip .val.cool { color: var(--success); }
+
+/* ---------- Robot / MQTT Status ---------- */
+.status-grid {
+    display: grid; grid-template-columns: auto 1fr;
+    gap: 4px 12px; font-size: 12px; font-family: var(--mono);
+}
+.status-grid .k { color: var(--text-subtle); text-align: right; }
+.status-grid .v { word-break: break-all; }
+.badge {
+    display: inline-block; padding: 1px 6px;
+    border-radius: 3px; font-size: 11px; font-weight: 600;
+}
+.badge.idle { background: var(--success-dim); color: var(--success); }
+.badge.dancing { background: var(--warning-dim); color: var(--warning); }
+.badge.offline { background: var(--danger-dim); color: var(--danger); }
+.badge.error { background: var(--danger-dim); color: var(--danger); }
+
+/* ---------- Log Viewer ---------- */
+.log-tabs {
+    display: flex; border-bottom: 1px solid var(--border);
+}
+.log-tab {
+    padding: 8px 14px; font-size: 12px;
+    font-family: var(--mono); cursor: pointer;
+    color: var(--text-subtle); border: none;
+    background: none; border-bottom: 2px solid transparent;
+}
+.log-tab:hover { color: var(--text); }
+.log-tab.active {
+    color: var(--accent-light);
+    border-bottom-color: var(--accent);
+}
+.log-controls {
+    display: flex; gap: 8px; padding: 6px 14px;
+    align-items: center; border-bottom: 1px solid var(--border);
+}
+.log-controls input {
+    flex: 1; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; color: var(--text);
+    font-family: var(--mono); font-size: 11px;
+    outline: none;
+}
+.log-controls input:focus { border-color: var(--accent); }
+.log-controls button {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 10px;
+    color: var(--text-subtle); cursor: pointer;
+    font-size: 11px; font-family: var(--mono);
+}
+.log-controls button:hover { color: var(--text); border-color: var(--text-subtle); }
+.log-controls button.active { color: var(--accent-light); border-color: var(--accent); }
+.log-viewport {
+    height: 350px; overflow-y: auto;
+    padding: 8px 14px;
+    font-family: var(--mono); font-size: 11px;
+    line-height: 1.5;
+    background: var(--bg);
+}
+.log-line { white-space: pre-wrap; word-break: break-all; }
+.log-line.error { color: var(--danger); }
+.log-line.warn { color: var(--warning); }
+.log-line.info { color: #74b9ff; }
+.log-line.debug { color: var(--text-subtle); }
+.log-line.hidden { display: none; }
+
+/* ---------- Process Table ---------- */
+.proc-table {
+    width: 100%; font-family: var(--mono); font-size: 11px;
+    border-collapse: collapse;
+}
+.proc-table th {
+    text-align: left; color: var(--text-subtle);
+    padding: 4px 8px; border-bottom: 1px solid var(--border);
+    font-weight: 600;
+}
+.proc-table td { padding: 3px 8px; }
+.proc-table tr:hover td { background: var(--surface2); }
+
+/* ---------- Network ---------- */
+.net-iface {
+    margin-bottom: 8px; padding: 8px;
+    background: var(--surface2); border-radius: 4px;
+    font-family: var(--mono); font-size: 11px;
+}
+.net-iface:last-child { margin-bottom: 0; }
+.net-iface .if-name { font-weight: 600; margin-bottom: 2px; display: flex; gap: 8px; align-items: center; }
+.net-iface .if-detail { color: var(--text-subtle); }
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-subtle); }
+
+/* ---------- Utilities ---------- */
+.empty { color: var(--text-subtle); font-style: italic; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- ===== Top Bar ===== -->
+<div class="topbar">
+    <h1>&gt;_ X2 Debug Terminal</h1>
+    <div class="meta">
+        <span><span class="conn-dot" id="connDot"></span><span id="connText">connecting...</span></span>
+        <span>Up: <span id="uptime">--</span></span>
+        <span>Host: <span id="hostname">--</span></span>
+    </div>
+</div>
+
+<!-- ===== Main Grid ===== -->
+<div class="grid">
+
+    <!-- Services -->
+    <div class="panel">
+        <div class="panel-header">Services</div>
+        <div class="panel-body">
+            <div class="svc-grid" id="svcGrid">
+                <div class="empty">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Metrics -->
+    <div class="panel">
+        <div class="panel-header">System Metrics</div>
+        <div class="panel-body" id="metricsBody">
+            <div class="empty">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Robot State -->
+    <div class="panel">
+        <div class="panel-header">Robot State</div>
+        <div class="panel-body">
+            <div class="status-grid" id="robotGrid">
+                <div class="empty" style="grid-column:1/-1">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MQTT Status -->
+    <div class="panel">
+        <div class="panel-header">MQTT Status</div>
+        <div class="panel-body">
+            <div class="status-grid" id="mqttGrid">
+                <div class="empty" style="grid-column:1/-1">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Viewer -->
+    <div class="panel full">
+        <div class="log-tabs" id="logTabs">
+            <button class="log-tab active" data-svc="agibot_software">agibot_software</button>
+            <button class="log-tab" data-svc="x2-motion-api">x2-motion-api</button>
+            <button class="log-tab" data-svc="x2-mqtt-client">x2-mqtt-client</button>
+        </div>
+        <div class="log-controls">
+            <input type="text" id="logFilter" placeholder="Filter logs...">
+            <button id="btnAutoscroll" class="active" title="Auto-scroll">Auto-scroll</button>
+            <button id="btnClearLogs" title="Clear">Clear</button>
+        </div>
+        <div class="log-viewport" id="logViewport"></div>
+    </div>
+
+    <!-- Processes -->
+    <div class="panel full">
+        <div class="panel-header collapsible" onclick="togglePanel(this)">
+            Processes (top 15 by memory) <span class="chevron">&#9660;</span>
+        </div>
+        <div class="panel-body" id="procBody">
+            <div class="empty">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Network -->
+    <div class="panel full">
+        <div class="panel-header collapsible" onclick="togglePanel(this)">
+            Network <span class="chevron">&#9660;</span>
+        </div>
+        <div class="panel-body" id="netBody">
+            <div class="empty">Loading...</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ===== State =====
+const MAX_LOG_LINES = 500;
+const SERVICES = ["agibot_software", "x2-motion-api", "x2-mqtt-client"];
+let activeLogSvc = SERVICES[0];
+let logBuffers = {}; SERVICES.forEach(s => logBuffers[s] = []);
+let eventSources = {};
+let autoscroll = true;
+let connected = false;
+
+// ===== Helpers =====
+function fmt(bytes) {
+    if (bytes == null) return "--";
+    const u = ["B","KB","MB","GB","TB"];
+    let i = 0;
+    while (Math.abs(bytes) >= 1024 && i < u.length - 1) { bytes /= 1024; i++; }
+    return bytes.toFixed(1) + " " + u[i];
+}
+
+function fmtUptime(sec) {
+    if (sec == null) return "--";
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+}
+
+async function api(path) {
+    const r = await fetch(path, { signal: AbortSignal.timeout(4000) });
+    return r.json();
+}
+
+function setConn(ok) {
+    connected = ok;
+    const dot = document.getElementById("connDot");
+    const txt = document.getElementById("connText");
+    dot.className = "conn-dot" + (ok ? " ok" : "");
+    txt.textContent = ok ? "connected" : "disconnected";
+}
+
+function togglePanel(header) {
+    header.classList.toggle("collapsed");
+    header.nextElementSibling.classList.toggle("collapsed");
+}
+
+// ===== Services Panel =====
+async function refreshServices() {
+    try {
+        const data = await api("/api/services");
+        const el = document.getElementById("svcGrid");
+        el.innerHTML = data.map(s => {
+            const state = s.ActiveState || "unknown";
+            const dotCls = state === "active" ? "active" : state === "failed" ? "failed" : "inactive";
+            const mem = s.MemoryCurrent ? fmt(s.MemoryCurrent) : "--";
+            const ts = s.ExecMainStartTimestamp || "";
+            return `<div class="svc-card">
+                <div class="name"><span class="svc-dot ${dotCls}"></span>${s.name}</div>
+                <div class="svc-detail">
+                    State: ${state} (${s.SubState || "?"})<br>
+                    PID: ${s.MainPID || "--"}<br>
+                    Mem: ${mem}<br>
+                    ${ts ? "Since: " + ts : ""}
+                </div>
+            </div>`;
+        }).join("");
+        setConn(true);
+    } catch(e) { setConn(false); }
+}
+
+// ===== Metrics Panel =====
+async function refreshMetrics() {
+    try {
+        const d = await api("/api/metrics");
+        const el = document.getElementById("metricsBody");
+
+        if (d.uptime_sec != null) {
+            document.getElementById("uptime").textContent = fmtUptime(d.uptime_sec);
+        }
+
+        const cpuPct = Math.min(((d.load_avg["1m"] || 0) / d.cpu_count) * 100, 100).toFixed(0);
+        const memPct = d.memory ? d.memory.percent : 0;
+        const diskPct = d.disk ? d.disk.percent : 0;
+
+        let html = `
+            <div class="metric-row">
+                <span class="metric-label">CPU</span>
+                <div class="metric-bar-wrap"><div class="metric-bar cpu" style="width:${cpuPct}%"></div></div>
+                <span class="metric-val">${cpuPct}% (${d.load_avg["1m"].toFixed(1)})</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Mem</span>
+                <div class="metric-bar-wrap"><div class="metric-bar mem" style="width:${memPct}%"></div></div>
+                <span class="metric-val">${memPct}% ${d.memory ? fmt(d.memory.used) : ""}</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Disk</span>
+                <div class="metric-bar-wrap"><div class="metric-bar disk" style="width:${diskPct}%"></div></div>
+                <span class="metric-val">${diskPct}% ${d.disk ? fmt(d.disk.used) : ""}</span>
+            </div>`;
+
+        if (d.gpu) {
+            html += `<div class="metric-row">
+                <span class="metric-label">GPU</span>
+                <div class="metric-bar-wrap"><div class="metric-bar gpu" style="width:${d.gpu.load_percent}%"></div></div>
+                <span class="metric-val">${d.gpu.load_percent}%${d.gpu.freq_mhz ? " " + d.gpu.freq_mhz + "MHz" : ""}</span>
+            </div>`;
+        }
+
+        if (d.temperatures && d.temperatures.length) {
+            html += '<div class="temp-grid">';
+            d.temperatures.forEach(t => {
+                const cls = t.temp_c >= 80 ? "hot" : t.temp_c >= 60 ? "warm" : "cool";
+                html += `<div class="temp-chip">${t.zone}: <span class="val ${cls}">${t.temp_c}&deg;C</span></div>`;
+            });
+            html += '</div>';
+        }
+
+        el.innerHTML = html;
+        setConn(true);
+    } catch(e) { setConn(false); }
+}
+
+// ===== Robot State =====
+async function refreshRobot() {
+    try {
+        const d = await api("/api/robot");
+        const el = document.getElementById("robotGrid");
+        if (d.error) {
+            el.innerHTML = `<span class="empty" style="grid-column:1/-1"><span class="badge error">API unreachable</span> ${d.error}</span>`;
+            return;
+        }
+        const state = (d.state || d.status || "unknown").toLowerCase();
+        const badgeCls = state === "idle" ? "idle" : state === "dancing" ? "dancing" : "offline";
+        el.innerHTML = `
+            <span class="k">State</span><span class="v"><span class="badge ${badgeCls}">${state}</span></span>
+            <span class="k">Mode</span><span class="v">${d.mode || "--"}</span>
+            ${d.current_motion ? `<span class="k">Motion</span><span class="v">${d.current_motion}</span>` : ""}
+            ${d.motions_count != null ? `<span class="k">Motions</span><span class="v">${d.motions_count} registered</span>` : ""}
+        `;
+    } catch(e) {
+        document.getElementById("robotGrid").innerHTML = '<span class="empty" style="grid-column:1/-1"><span class="badge error">fetch failed</span></span>';
+    }
+}
+
+// ===== MQTT Status =====
+async function refreshMqtt() {
+    try {
+        const d = await api("/api/mqtt-status");
+        const el = document.getElementById("mqttGrid");
+        const isActive = d.active === "active";
+        el.innerHTML = `
+            <span class="k">Service</span><span class="v"><span class="badge ${isActive ? "idle" : "error"}">${d.active}</span></span>
+            <span class="k">Connected</span><span class="v">${d.last_connected || "--"}</span>
+            <span class="k">Published</span><span class="v">${d.last_published || "--"}</span>
+            <span class="k">Received</span><span class="v">${d.last_received || "--"}</span>
+        `;
+    } catch(e) {}
+}
+
+// ===== Log Viewer =====
+function classifyLine(line) {
+    const l = line.toLowerCase();
+    if (l.includes("error") || l.includes("failed") || l.includes("traceback") || l.includes("exception"))
+        return "error";
+    if (l.includes("warn")) return "warn";
+    if (l.includes("info")) return "info";
+    if (l.includes("debug")) return "debug";
+    return "";
+}
+
+function renderLogBuffer() {
+    const vp = document.getElementById("logViewport");
+    const filter = document.getElementById("logFilter").value.toLowerCase();
+    const buf = logBuffers[activeLogSvc] || [];
+    vp.innerHTML = buf.map(line => {
+        const cls = classifyLine(line);
+        const hidden = filter && !line.toLowerCase().includes(filter) ? " hidden" : "";
+        return `<div class="log-line ${cls}${hidden}">${escHtml(line)}</div>`;
+    }).join("");
+    if (autoscroll) vp.scrollTop = vp.scrollHeight;
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function connectLogStream(svc) {
+    if (eventSources[svc]) return; // already connected
+    const es = new EventSource(`/stream/logs/${svc}`);
+    es.onmessage = (e) => {
+        try {
+            const d = JSON.parse(e.data);
+            const buf = logBuffers[svc];
+            buf.push(d.line);
+            while (buf.length > MAX_LOG_LINES) buf.shift();
+            if (svc === activeLogSvc) {
+                const vp = document.getElementById("logViewport");
+                const filter = document.getElementById("logFilter").value.toLowerCase();
+                const cls = classifyLine(d.line);
+                const hidden = filter && !d.line.toLowerCase().includes(filter) ? " hidden" : "";
+                const div = document.createElement("div");
+                div.className = `log-line ${cls}${hidden}`;
+                div.textContent = d.line;
+                vp.appendChild(div);
+                // Trim DOM
+                while (vp.children.length > MAX_LOG_LINES) vp.removeChild(vp.firstChild);
+                if (autoscroll) vp.scrollTop = vp.scrollHeight;
+            }
+        } catch(err) {}
+    };
+    es.onerror = () => {
+        es.close();
+        delete eventSources[svc];
+        // Reconnect after 3s
+        setTimeout(() => connectLogStream(svc), 3000);
+    };
+    eventSources[svc] = es;
+}
+
+// Tab switching
+document.getElementById("logTabs").addEventListener("click", (e) => {
+    if (!e.target.classList.contains("log-tab")) return;
+    document.querySelectorAll(".log-tab").forEach(t => t.classList.remove("active"));
+    e.target.classList.add("active");
+    activeLogSvc = e.target.dataset.svc;
+    renderLogBuffer();
+    connectLogStream(activeLogSvc);
+});
+
+// Filter
+document.getElementById("logFilter").addEventListener("input", () => renderLogBuffer());
+
+// Autoscroll
+const btnAuto = document.getElementById("btnAutoscroll");
+btnAuto.addEventListener("click", () => {
+    autoscroll = !autoscroll;
+    btnAuto.classList.toggle("active", autoscroll);
+    if (autoscroll) {
+        const vp = document.getElementById("logViewport");
+        vp.scrollTop = vp.scrollHeight;
+    }
+});
+
+// Pause autoscroll on manual scroll up
+document.getElementById("logViewport").addEventListener("scroll", function() {
+    if (this.scrollHeight - this.scrollTop - this.clientHeight > 50) {
+        autoscroll = false;
+        btnAuto.classList.remove("active");
+    }
+});
+
+// Clear
+document.getElementById("btnClearLogs").addEventListener("click", () => {
+    logBuffers[activeLogSvc] = [];
+    document.getElementById("logViewport").innerHTML = "";
+});
+
+// ===== Processes =====
+async function refreshProcesses() {
+    try {
+        const data = await api("/api/processes");
+        const el = document.getElementById("procBody");
+        if (!data.length) { el.innerHTML = '<div class="empty">No data</div>'; return; }
+        let html = `<table class="proc-table">
+            <tr><th>PID</th><th>User</th><th>CPU%</th><th>MEM%</th><th>RSS</th><th>Command</th></tr>`;
+        data.forEach(p => {
+            html += `<tr><td>${p.pid}</td><td>${p.user}</td><td>${p.cpu}</td><td>${p.mem}</td><td>${p.rss}</td><td>${escHtml(p.command)}</td></tr>`;
+        });
+        html += "</table>";
+        el.innerHTML = html;
+    } catch(e) {}
+}
+
+// ===== Network =====
+async function refreshNetwork() {
+    try {
+        const d = await api("/api/network");
+        const el = document.getElementById("netBody");
+        let html = "";
+
+        // Internet status
+        html += `<div style="margin-bottom:10px;font-family:var(--mono);font-size:12px;">
+            Internet: <span class="badge ${d.internet ? "idle" : "error"}">${d.internet ? "online" : "offline"}</span>
+        </div>`;
+
+        (d.interfaces || []).forEach(iface => {
+            if (iface.name === "lo") return;
+            const t = d.traffic[iface.name] || {};
+            const stateColor = iface.state === "UP" ? "var(--success)" : "var(--text-subtle)";
+            html += `<div class="net-iface">
+                <div class="if-name">
+                    <span style="color:${stateColor}">${iface.name}</span>
+                    <span style="color:var(--text-subtle);font-weight:normal">${iface.state}</span>
+                </div>
+                <div class="if-detail">
+                    ${iface.addresses.length ? "Addr: " + iface.addresses.join(", ") : "No address"}
+                    ${t.rx_bytes != null ? "<br>RX: " + fmt(t.rx_bytes) + " / TX: " + fmt(t.tx_bytes) : ""}
+                </div>
+            </div>`;
+        });
+
+        el.innerHTML = html || '<div class="empty">No interfaces</div>';
+    } catch(e) {}
+}
+
+// ===== Hostname =====
+async function fetchHostname() {
+    try {
+        const d = await api("/api/metrics");
+        // Use window.location as fallback
+        document.getElementById("hostname").textContent = window.location.hostname + ":" + window.location.port;
+    } catch(e) {}
+}
+
+// ===== Init =====
+function init() {
+    document.getElementById("hostname").textContent = window.location.host;
+
+    // Start SSE for active tab
+    connectLogStream(activeLogSvc);
+
+    // Fast polling (2s): services, metrics, robot, mqtt
+    refreshServices(); refreshMetrics(); refreshRobot(); refreshMqtt();
+    setInterval(() => {
+        refreshServices(); refreshMetrics(); refreshRobot(); refreshMqtt();
+    }, 2000);
+
+    // Slow polling (5s): processes, network
+    refreshProcesses(); refreshNetwork();
+    setInterval(() => { refreshProcesses(); refreshNetwork(); }, 5000);
+}
+
+init();
+</script>
+</body>
+</html>

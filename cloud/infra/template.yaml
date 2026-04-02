@@ -138,6 +138,27 @@ Resources:
             Path: /api/status/{robot_id}
             Method: GET
 
+  SendCommandFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: X2DanceKiosk-SendCommand
+      Handler: send_command.lambda_handler
+      CodeUri: ../lambdas/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref RobotStateTable
+        - Statement:
+            - Effect: Allow
+              Action: iot:Publish
+              Resource: !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/x2/*/command/*"
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/command
+            Method: POST
+
   # ── API Gateway ──────────────────────────────────────────
 
   HttpApi:

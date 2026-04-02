@@ -1,0 +1,14 @@
+[Unit]
+Description=X2 Debug Terminal (Web Monitoring)
+After=x2-motion-api.service
+
+[Service]
+Type=simple
+User=run
+WorkingDirectory=/home/run/x2_api
+ExecStart=/home/run/x2_api/debug_run.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

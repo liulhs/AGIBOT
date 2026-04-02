@@ -16,9 +16,24 @@
         <main>
             <!-- Idle: show dance menu -->
             <section id="dance-menu" class="hidden">
-                <p class="subtitle">Pick a dance and watch the robot perform!</p>
+                <h2 class="section-label">Dances <span class="label-tag paid">$2.00</span></h2>
                 <div id="dance-list" class="dance-grid"></div>
+
+                <h2 class="section-label">Gestures <span class="label-tag free">Free</span></h2>
+                <p class="subtitle">Tap a gesture, pick a variant, and confirm!</p>
+                <div id="gesture-list" class="gesture-grid"></div>
             </section>
+
+            <!-- Confirm modal -->
+            <div id="confirm-modal" class="modal-overlay hidden">
+                <div class="confirm-modal">
+                    <p id="confirm-text">Perform this gesture?</p>
+                    <div class="modal-actions">
+                        <button id="confirm-yes" class="btn btn-confirm">Confirm</button>
+                        <button id="confirm-no" class="btn btn-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Dancing: show feedback -->
             <section id="dancing-view" class="hidden">

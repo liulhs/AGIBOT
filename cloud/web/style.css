@@ -10,6 +10,7 @@
     --accent: #6c5ce7;
     --accent-light: #a29bfe;
     --success: #00b894;
+    --success-dim: #00b89433;
     --danger: #e17055;
 }
 
@@ -52,16 +53,44 @@ header h1 {
 .badge.dancing { background: var(--accent); color: #fff; }
 .badge.offline { background: var(--danger); color: #fff; }
 
-.subtitle {
-    color: var(--text-subtle);
-    margin-bottom: 24px;
+/* ── Section labels ────────────────────────────────── */
+
+.section-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 28px 0 12px;
     text-align: center;
 }
+
+.section-label:first-child {
+    margin-top: 0;
+}
+
+.label-tag {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    vertical-align: middle;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+.label-tag.paid { background: var(--accent); color: #fff; }
+.label-tag.free { background: var(--success); color: #000; }
+
+.subtitle {
+    color: var(--text-subtle);
+    margin-bottom: 16px;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+/* ── Dance grid (paid, 2-col) ──────────────────────── */
 
 .dance-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+    margin-bottom: 8px;
 }
 
 .dance-card {
@@ -95,6 +124,132 @@ header h1 {
     font-weight: 600;
 }
 
+/* ── Gesture grid (free, 3-col compact) ────────────── */
+
+.gesture-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+}
+
+.gesture-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+}
+.gesture-tile:active {
+    transform: scale(0.97);
+}
+.gesture-tile:hover {
+    border-color: var(--success);
+}
+.gesture-tile.expanded {
+    border-color: var(--success);
+    background: var(--success-dim);
+    grid-column: 1 / -1;
+}
+
+.gesture-emoji {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+}
+
+.gesture-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+/* ── Variant chips (inside expanded tile) ──────────── */
+
+.variant-chips {
+    display: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.gesture-tile.expanded .variant-chips {
+    display: flex;
+}
+
+.variant-chip {
+    padding: 6px 14px;
+    border: 1px solid var(--success);
+    border-radius: 16px;
+    background: transparent;
+    color: var(--success);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.variant-chip:hover, .variant-chip:active {
+    background: var(--success);
+    color: #000;
+}
+
+/* ── Confirm modal ─────────────────────────────────── */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.confirm-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: center;
+    max-width: 320px;
+    width: 90%;
+}
+
+.confirm-modal p {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.btn {
+    display: inline-block;
+    padding: 12px 32px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-confirm {
+    background: var(--success);
+    color: #000;
+}
+
+.btn-cancel {
+    background: var(--border);
+    color: var(--text);
+}
+
+/* ── Dancing / status views ────────────────────────── */
+
 .dancing-animation {
     font-size: 4rem;
     text-align: center;
@@ -117,7 +272,7 @@ main section {
     text-align: center;
 }
 
-main h2 {
+main h2:not(.section-label) {
     font-size: 1.3rem;
     margin-bottom: 8px;
 }
@@ -126,19 +281,6 @@ main h2 {
     color: var(--text-subtle);
     font-size: 0.9rem;
     margin-top: 12px;
-}
-
-.btn {
-    display: inline-block;
-    padding: 12px 32px;
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 16px;
 }
 
 footer {
