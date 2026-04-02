@@ -46,11 +46,18 @@ class MqttCommandHandler:
 
     VALID_ACTIONS = {"play_motion", "stop_motion", "set_mode", "play_preset"}
 
+    # Minimum seconds to hold "dancing" state before allowing completion detection.
+    # LinkCraft motions play as overlays — robot stays STAND_DEFAULT/RUNNING the
+    # whole time, so we can't detect completion from mode alone.  This grace
+    # period prevents the heartbeat from immediately resetting to idle.
+    MIN_DANCE_SEC = 15
+
     def __init__(self, publish_fn, robot_id: str):
         self._publish = publish_fn
         self._robot_id = robot_id
         self._state = "idle"
         self._current_motion = None
+        self._dance_started_at = 0.0  # monotonic timestamp
 
     @staticmethod
     def _now():
@@ -156,6 +163,7 @@ class MqttCommandHandler:
         if "error" not in result:
             self._state = "dancing"
             self._current_motion = motion_id
+            self._dance_started_at = time.monotonic()
         else:
             self._publish_error(request_id, result.get("error", "play failed"))
             return
@@ -282,19 +290,24 @@ def main():
                     break
                 if cmd.get("_type") == "heartbeat":
                     try:
-                        # Detect motion completion: if we think we're dancing
-                        # but the robot is back to STAND_DEFAULT, motion finished.
+                        # Detect motion completion.
+                        # LinkCraft motions play as overlays on STAND_DEFAULT —
+                        # mode/status stays the same during playback.  We enforce
+                        # a minimum grace period so the heartbeat doesn't
+                        # immediately reset to idle.
                         if handler._state == "dancing":
-                            try:
-                                data = handler._rest("GET", "/robot/state")
-                                mode = data.get("mode", "UNKNOWN")
-                                status = data.get("status", "")
-                                if mode == "STAND_DEFAULT" and status == "RUNNING":
-                                    logger.info("Motion completed — resetting to idle")
-                                    handler._state = "idle"
-                                    handler._current_motion = None
-                            except Exception:
-                                pass
+                            elapsed = time.monotonic() - handler._dance_started_at
+                            if elapsed >= handler.MIN_DANCE_SEC:
+                                try:
+                                    data = handler._rest("GET", "/robot/state")
+                                    mode = data.get("mode", "UNKNOWN")
+                                    status = data.get("status", "")
+                                    if mode == "STAND_DEFAULT" and status == "RUNNING":
+                                        logger.info("Motion completed (%.0fs elapsed) — resetting to idle", elapsed)
+                                        handler._state = "idle"
+                                        handler._current_motion = None
+                                except Exception:
+                                    pass
 
                         msg = json.dumps({
                             "robot_id": robot_id,

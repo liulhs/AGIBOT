@@ -35,7 +35,19 @@ bridge = ROS2Bridge()
 
 def startup():
     """Initialize ROS2 and register all motions."""
+    import time
     bridge.init()
+
+    # Wait for MC to be fully ready — at boot, agibot_software and this
+    # service start simultaneously.  The MC's motion subsystem needs time.
+    logger.info("Waiting for MC motion subsystem to be ready...")
+    for attempt in range(10):
+        mode = bridge.get_mode()
+        if mode["mode"] != "UNKNOWN" and mode["status_code"] >= 0:
+            logger.info("MC is ready (mode=%s, attempt=%d).", mode["mode"], attempt + 1)
+            break
+        logger.info("  MC not ready yet (attempt %d/10), waiting 3s...", attempt + 1)
+        time.sleep(3)
 
     logger.info("Registering %d LinkCraft motions with MC...", len(catalog.list_all()))
     for motion in catalog.list_all():
@@ -141,11 +153,15 @@ def play_motion():
                 "hint": "Set auto_stand=true to auto-switch, or POST /api/v1/robot/mode first",
             }), 409
 
-    # Register if not already
-    if not motion["registered"]:
-        reg = bridge.register_motion(motion["tag"], motion["motion_type"], motion["res_path"])
-        if reg["success"]:
-            catalog.mark_registered(motion_id)
+    # Always re-register before play — registration is idempotent and cheap.
+    # At boot the MC may not be ready, causing silent registration failures
+    # (status=UNKNOWN instead of SUCCESS).  Re-registering here ensures the
+    # motion is loaded before we try to play it.
+    reg = bridge.register_motion(motion["tag"], motion["motion_type"], motion["res_path"])
+    if reg["success"]:
+        catalog.mark_registered(motion_id)
+    else:
+        return jsonify({"error": "Failed to register motion", "detail": reg["message"]}), 500
 
     result = bridge.play_motion(motion["tag"], motion["motion_type"], interrupt)
     result["motion_id"] = motion_id
