@@ -132,6 +132,52 @@ class MqttCommandHandler:
             logger.exception("Error handling %s", action)
             self._publish_error(request_id, f"Internal error handling {action}")
 
+    # Safe mode transition sequence to reach STAND_DEFAULT.
+    # Cannot jump directly from PASSIVE to STAND — must go through
+    # DAMPING and JOINT first. Each step needs settling time.
+    _STAND_SEQUENCE = [
+        ("DAMPING_DEFAULT", 2),
+        ("JOINT_DEFAULT", 2),
+        ("STAND_DEFAULT", 3),
+    ]
+
+    def _auto_stand(self) -> bool:
+        """Transition the robot to STAND_DEFAULT through safe intermediate modes.
+
+        Returns True if robot is in STAND_DEFAULT, False on failure.
+        """
+        mode = self._get_mode()
+        if mode == "STAND_DEFAULT":
+            return True
+
+        logger.info("Auto-standing robot (current mode: %s)", mode)
+
+        # Determine where to start in the sequence
+        mode_order = [s[0] for s in self._STAND_SEQUENCE]
+        start_idx = 0
+        if mode in mode_order:
+            start_idx = mode_order.index(mode) + 1
+
+        for target_mode, wait_sec in self._STAND_SEQUENCE[start_idx:]:
+            logger.info("Transitioning to %s (wait %ds)", target_mode, wait_sec)
+            try:
+                result = self._rest("POST", "/robot/mode", {"mode": target_mode})
+                if result.get("error"):
+                    logger.error("Mode transition to %s failed: %s", target_mode, result)
+                    return False
+            except Exception:
+                logger.exception("REST call failed during auto-stand to %s", target_mode)
+                return False
+            time.sleep(wait_sec)
+
+        final_mode = self._get_mode()
+        if final_mode != "STAND_DEFAULT":
+            logger.error("Auto-stand finished but mode is %s, not STAND_DEFAULT", final_mode)
+            return False
+
+        logger.info("Auto-stand complete — robot is in STAND_DEFAULT")
+        return True
+
     def _handle_play_motion(self, request_id: str, payload: dict):
         motion_id = payload.get("motion_id", "")
         auto_stand = payload.get("auto_stand", False)
@@ -144,9 +190,9 @@ class MqttCommandHandler:
         mode = self._get_mode()
         if mode != "STAND_DEFAULT":
             if auto_stand:
-                logger.info("Auto-standing robot (current mode: %s)", mode)
-                self._rest("POST", "/robot/mode", {"mode": "STAND_DEFAULT"})
-                time.sleep(3)
+                if not self._auto_stand():
+                    self._publish_error(request_id, "Auto-stand failed — check robot posture")
+                    return
             else:
                 self._publish_error(request_id,
                                     f"Robot not standing (mode={mode}). Set auto_stand=true.")
@@ -189,6 +235,12 @@ class MqttCommandHandler:
         if not motion_id:
             self._publish_error(request_id, "Missing 'motion_id' for preset")
             return
+
+        # Auto-stand if needed (all presets require STAND_DEFAULT)
+        if not self._auto_stand():
+            self._publish_error(request_id, "Auto-stand failed — check robot posture")
+            return
+
         self._rest("POST", "/presets/play", {"motion_id": motion_id, "area": area})
         self._publish_status()
 

@@ -1,21 +1,21 @@
-/* cloud/web/style.css — Mobile-first dance kiosk */
+/* cloud/web/style.css — Kiosk UI aligned with robotx-share design system */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-    --bg: #0a0a0f;
-    --surface: #16161d;
-    --border: #2a2a35;
-    --text: #e8e8ed;
-    --text-subtle: #8888aa;
-    --accent: #6c5ce7;
-    --accent-light: #a29bfe;
+    --robotx: #111827;
+    --robotx-muted: #6b7280;
+    --robotx-subtle: #e5e7eb;
+    --robotx-surface: #f3f4f6;
     --success: #00b894;
-    --success-dim: #00b89433;
+    --success-light: #00b89418;
     --danger: #e17055;
+    --bg: #ffffff;
+    --text: #111827;
+    --text-light: #6b7280;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
@@ -29,37 +29,48 @@ body {
     padding: 24px 16px;
 }
 
+/* ── Header ────────────────────────────────────────── */
+
 header {
     text-align: center;
     margin-bottom: 32px;
 }
 
 header h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--robotx);
     margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
+
+/* ── Badge ─────────────────────────────────────────── */
 
 .badge {
     display: inline-block;
-    padding: 4px 12px;
+    padding: 4px 14px;
     border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
-.badge.idle { background: var(--success); color: #000; }
-.badge.dancing { background: var(--accent); color: #fff; }
+.badge.idle { background: var(--success); color: #fff; }
+.badge.dancing { background: var(--robotx); color: #fff; }
 .badge.offline { background: var(--danger); color: #fff; }
+.badge.unknown { background: var(--robotx-subtle); color: var(--robotx-muted); }
 
 /* ── Section labels ────────────────────────────────── */
 
 .section-label {
-    font-size: 1.1rem;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.25rem;
     font-weight: 700;
-    margin: 28px 0 12px;
-    text-align: center;
+    color: var(--robotx);
+    margin: 28px 0 10px;
+    text-align: left;
 }
 
 .section-label:first-child {
@@ -67,21 +78,23 @@ header h1 {
 }
 
 .label-tag {
-    font-size: 0.7rem;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.65rem;
     padding: 2px 8px;
     border-radius: 10px;
     vertical-align: middle;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.03em;
 }
-.label-tag.paid { background: var(--accent); color: #fff; }
-.label-tag.free { background: var(--success); color: #000; }
+.label-tag.paid { background: var(--robotx); color: #fff; }
+.label-tag.free { background: var(--success); color: #fff; }
 
 .subtitle {
-    color: var(--text-subtle);
-    margin-bottom: 16px;
-    text-align: center;
+    color: var(--text-light);
+    margin-bottom: 14px;
+    text-align: left;
     font-size: 0.85rem;
+    font-weight: 300;
 }
 
 /* ── Dance grid (paid, 2-col) ──────────────────────── */
@@ -94,17 +107,23 @@ header h1 {
 }
 
 .dance-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--robotx-surface);
+    border: 1px solid transparent;
     border-radius: 12px;
     padding: 20px 12px;
     text-align: center;
     cursor: pointer;
-    transition: transform 0.15s, border-color 0.15s;
+    transition: transform 0.3s cubic-bezier(0, 0.71, 0.2, 1.01),
+                box-shadow 0.3s ease,
+                border-color 0.2s ease;
+}
+.dance-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    border-color: var(--robotx-subtle);
 }
 .dance-card:active {
     transform: scale(0.97);
-    border-color: var(--accent);
 }
 
 .dance-card .emoji {
@@ -113,14 +132,15 @@ header h1 {
 }
 
 .dance-card .name {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
+    color: var(--robotx);
     margin-bottom: 4px;
 }
 
 .dance-card .price {
-    font-size: 0.85rem;
-    color: var(--accent-light);
+    font-size: 0.8rem;
+    color: var(--text-light);
     font-weight: 600;
 }
 
@@ -133,24 +153,31 @@ header h1 {
 }
 
 .gesture-tile {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--robotx-surface);
+    border: 1px solid transparent;
     border-radius: 10px;
     padding: 12px 6px;
     text-align: center;
     cursor: pointer;
-    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+    transition: transform 0.3s cubic-bezier(0, 0.71, 0.2, 1.01),
+                box-shadow 0.3s ease,
+                border-color 0.2s ease,
+                background 0.2s ease;
+}
+.gesture-tile:hover {
+    transform: scale(1.03);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    border-color: var(--robotx-subtle);
 }
 .gesture-tile:active {
     transform: scale(0.97);
 }
-.gesture-tile:hover {
-    border-color: var(--success);
-}
 .gesture-tile.expanded {
     border-color: var(--success);
-    background: var(--success-dim);
+    background: var(--success-light);
     grid-column: 1 / -1;
+    transform: none;
+    box-shadow: 0 2px 12px rgba(0, 184, 148, 0.1);
 }
 
 .gesture-emoji {
@@ -159,8 +186,9 @@ header h1 {
 }
 
 .gesture-name {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
+    color: var(--robotx);
     line-height: 1.2;
 }
 
@@ -180,18 +208,23 @@ header h1 {
 
 .variant-chip {
     padding: 6px 14px;
-    border: 1px solid var(--success);
-    border-radius: 16px;
+    border: 2px solid var(--robotx);
+    border-radius: 8px;
     background: transparent;
-    color: var(--success);
+    color: var(--robotx);
+    font-family: 'Nunito', sans-serif;
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.2s, color 0.2s, opacity 0.2s;
 }
-.variant-chip:hover, .variant-chip:active {
-    background: var(--success);
-    color: #000;
+.variant-chip:hover {
+    background: var(--robotx);
+    color: #fff;
+    opacity: 0.8;
+}
+.variant-chip:active {
+    opacity: 1;
 }
 
 /* ── Confirm modal ─────────────────────────────────── */
@@ -199,7 +232,7 @@ header h1 {
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.4);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -207,18 +240,20 @@ header h1 {
 }
 
 .confirm-modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--bg);
+    border: 1px solid var(--robotx-subtle);
     border-radius: 16px;
     padding: 28px 24px;
     text-align: center;
     max-width: 320px;
     width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
 .confirm-modal p {
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 600;
+    color: var(--robotx);
     margin-bottom: 20px;
 }
 
@@ -228,24 +263,37 @@ header h1 {
     justify-content: center;
 }
 
+/* ── Buttons (matches robotx-share Button.tsx) ─────── */
+
 .btn {
     display: inline-block;
     padding: 12px 32px;
-    border: none;
+    border: 2px solid var(--robotx);
     border-radius: 8px;
-    font-size: 1rem;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
+    transition: opacity 0.2s;
+}
+.btn:hover {
+    opacity: 0.8;
+}
+.btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 
 .btn-confirm {
-    background: var(--success);
-    color: #000;
+    background: var(--robotx);
+    color: #fff;
+    border-color: var(--robotx);
 }
 
 .btn-cancel {
-    background: var(--border);
-    color: var(--text);
+    background: var(--bg);
+    color: var(--robotx);
+    border-color: var(--robotx);
 }
 
 /* ── Dancing / status views ────────────────────────── */
@@ -273,23 +321,37 @@ main section {
 }
 
 main h2:not(.section-label) {
-    font-size: 1.3rem;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--robotx);
     margin-bottom: 8px;
 }
 
+main p {
+    color: var(--text-light);
+    font-weight: 300;
+}
+
 .subtle {
-    color: var(--text-subtle);
+    color: var(--text-light);
     font-size: 0.9rem;
+    font-weight: 300;
     margin-top: 12px;
 }
 
+/* ── Footer ────────────────────────────────────────── */
+
 footer {
     text-align: center;
-    color: var(--text-subtle);
+    color: var(--robotx-muted);
     font-size: 0.75rem;
     margin-top: 48px;
 }
 
+/* ── Utilities ─────────────────────────────────────── */
+
 .hidden { display: none !important; }
 
-a { color: var(--accent-light); }
+a { color: var(--robotx); font-weight: 600; }
+a:hover { opacity: 0.7; }

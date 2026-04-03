@@ -14,13 +14,20 @@ from config import MOTION_TYPE_ANIMATION, MOTION_TYPE_MIMIC
 # Keys not listed here get auto-generated IDs from their display name.
 KNOWN_MOTIONS = {
     "linkcraft_resource_onnx_01KMS0NMK8F7MMFSET1MDV0BG6": "golf_swing_pro",
-    "linkcraft_resource_01KMRTZQ9HWX5WBEAYEK251GQ2": "golf_swing_csv",
     "linkcraft_resource_onnx_erlianti": "double_kick",
     "linkcraft_resource_onnx_zuiquan": "drunk_kungfu",
     "linkcraft_resource_onnx_taiji": "taichi",
     "linkcraft_resource_onnx_tianmao": "miao",
     "linkcraft_resource_onnx_depasito": "despacito",
     "linkcraft_resource_onnx_01KEVJX7PSAZQ04TW6YGPBP5SV": "love_you",
+}
+
+# Resources that are in resource_config.yaml but don't work with MC's
+# BmimicRLController. ANIMATION (CSV) type motions register and return
+# success from SetMcMotion, but MC never physically executes them.
+# Only MIMIC (ONNX) motions work.
+IGNORED_RESOURCES = {
+    "linkcraft_resource_01KMRTZQ9HWX5WBEAYEK251GQ2",  # golf_swing_csv — ANIMATION/CSV, MC ignores
 }
 
 
@@ -46,6 +53,8 @@ class MotionCatalog:
         for entry in data.get("resource_config", []):
             key = entry.get("resource_key", "")
             if not key.startswith("linkcraft_resource"):
+                continue
+            if key in IGNORED_RESOURCES:
                 continue
 
             version_info = entry.get("current_version", {})

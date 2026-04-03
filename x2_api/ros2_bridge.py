@@ -140,7 +140,12 @@ class ROS2Bridge:
     # ── LinkCraft Motions ─────────────────────────────────────────
 
     def register_motion(self, tag: str, motion_type: int, res_path: str) -> dict:
-        """Register a LinkCraft motion with MC. Returns {success, message}."""
+        """Register a LinkCraft motion with MC. Returns {success, message}.
+
+        After calling RegisterCustomMotion, verifies the motion is actually
+        in MC's registry via GetMcMotions.  This catches silent failures where
+        MC returns code=0 but doesn't load the motion.
+        """
         req = RegisterCustomMotion.Request()
         motion = McMotion()
         motion.tag = tag
@@ -151,18 +156,51 @@ class ROS2Bridge:
         req.res_path = res_path
         req.write_to_disk = False
 
+        logger.info("Registering motion: tag=%s, type=%d, path=%s", tag, motion_type, res_path)
+
         resp = self._call("register_motion", req, "RegisterCustomMotion")
         if resp is None:
-            return {"success": False, "message": "Service call failed"}
+            return {"success": False, "message": "Service call failed (no response)"}
 
         code = resp.response.header.code
         status = resp.response.status.value
+        logger.info("RegisterCustomMotion response: code=%d, status=%d", code, status)
+
         if code == 0 and status == CommonState.SUCCESS:
-            return {"success": True, "message": "Registered"}
-        return {"success": True, "message": f"Likely already registered (code={code}, status={status})"}
+            logger.info("Registration returned SUCCESS, verifying in MC registry...")
+        else:
+            logger.warning("Registration returned code=%d, status=%d — verifying in MC registry...", code, status)
+
+        # Verify the motion is actually in MC's registry (like test_golf_swing.py)
+        registered = self.list_registered_motions()
+        found = any(m["tag"] == tag for m in registered)
+        logger.info("MC registry has %d motions, target '%s' %s",
+                     len(registered), tag, "FOUND" if found else "NOT FOUND")
+        if registered:
+            for m in registered:
+                marker = " <-- TARGET" if m["tag"] == tag else ""
+                logger.debug("  - %s (type=%d)%s", m["tag"], m["type"], marker)
+
+        if found:
+            return {"success": True, "message": "Verified in MC registry"}
+        return {"success": False, "message": f"NOT in MC registry after register (code={code}, status={status})"}
 
     def play_motion(self, tag: str, motion_type: int, interrupt: bool = False) -> dict:
-        """Play a registered LinkCraft motion. Returns {success, message}."""
+        """Play a registered LinkCraft motion. Returns {success, message}.
+
+        Pre-checks that the motion is in MC's registry before attempting to play.
+        """
+        # Pre-check: verify motion is registered before trying to play
+        registered = self.list_registered_motions()
+        found = any(m["tag"] == tag for m in registered)
+        if not found:
+            logger.error("Motion '%s' NOT in MC registry — cannot play. Registered: %s",
+                         tag, [m["tag"] for m in registered])
+            return {"success": False,
+                    "message": f"Motion '{tag}' not in MC registry ({len(registered)} motions registered)"}
+
+        logger.info("Playing motion: tag=%s, type=%d, interrupt=%s", tag, motion_type, interrupt)
+
         req = SetMcMotion.Request()
         req.header = RequestHeader()
         motion = McMotion()
@@ -176,11 +214,14 @@ class ROS2Bridge:
 
         resp = self._call("set_motion", req, "SetMcMotion")
         if resp is None:
-            return {"success": False, "message": "Service call failed"}
+            return {"success": False, "message": "Service call failed (no response)"}
 
-        if resp.response.header.code == 0:
+        code = resp.response.header.code
+        logger.info("SetMcMotion response: code=%d", code)
+
+        if code == 0:
             return {"success": True, "message": "Motion playing"}
-        return {"success": False, "message": f"Failed (code={resp.response.header.code})"}
+        return {"success": False, "message": f"SetMcMotion failed (code={code})"}
 
     def list_registered_motions(self) -> list[dict]:
         """List motions currently registered with MC."""

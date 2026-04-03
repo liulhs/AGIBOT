@@ -195,7 +195,7 @@ AWS IoT Core MQTT client for cloud-to-robot command dispatch. Delegates all robo
 - **Motion completion detection:** Polls robot state every 2s while dancing; auto-resets to `idle` when motion finishes
 - **Adaptive heartbeat:** Publishes status every 10s (idle) or 2s (dancing) to keep DynamoDB fresh
 - **LWT:** Auto-publishes `state: "offline"` on disconnect
-- **Auto-stand:** Automatically stands the robot before playing a motion if not already standing
+- **Auto-stand:** Safe multi-step transition to STAND_DEFAULT before playing motions (PASSIVE → DAMPING → JOINT → STAND, with settling time at each step)
 - **Startup wait:** Waits up to 30s for REST API to be available before connecting to MQTT
 
 ### AWS Dance Kiosk Cloud Stack

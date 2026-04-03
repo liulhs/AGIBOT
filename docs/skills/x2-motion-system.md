@@ -69,18 +69,20 @@ aima topic / node / proc   # ROS2-like introspection
 
 Controls the robot's operating state. **Must be in STAND_DEFAULT before any motion.**
 
-| Mode | Description |
-|------|-------------|
-| `PASSIVE_DEFAULT` | Zero torque, limp joints (startup/maintenance) |
-| `DAMPING_DEFAULT` | Damping mode (safe movement) |
-| `JOINT_DEFAULT` | Position-locked stand (precise joint control) |
-| `STAND_DEFAULT` | Auto-balanced stand (**required for motions**) |
-| `LOCOMOTION_DEFAULT` | Walking/running mode |
-| `SIT_DOWN_DEFAULT` | Sit down |
-| `CROUCH_DOWN_DEFAULT` | Crouch |
-| `LIE_DOWN_DEFAULT` | Lie down |
-| `STAND_UP_DEFAULT` | Stand up from lying |
-| `ASCEND_STAIRS` / `DESCEND_STAIRS` | Stair modes |
+| Mode | Description | Safety |
+|------|-------------|--------|
+| `PASSIVE_DEFAULT` | Zero torque, limp joints | **DANGEROUS — robot collapses** |
+| `DAMPING_DEFAULT` | Joints resist but don't hold position | Safe intermediate |
+| `JOINT_DEFAULT` | Position-locked stand (precise joint control) | Safe, stable |
+| `STAND_DEFAULT` | Auto-balanced stand (**required for motions**) | Motion-ready |
+| `LOCOMOTION_DEFAULT` | Walking/running mode | Active (unified with STAND in v0.8+) |
+| `SIT_DOWN_DEFAULT` | Sit down | Transition |
+| `CROUCH_DOWN_DEFAULT` | Crouch | Transition |
+| `LIE_DOWN_DEFAULT` | Lie down | Transition |
+| `STAND_UP_DEFAULT` | Stand up from lying/sitting | Transition |
+| `ASCEND_STAIRS` / `DESCEND_STAIRS` | Stair modes | Specialized |
+
+**Safe auto-stand sequence:** `PASSIVE → DAMPING (2s) → JOINT (2s) → STAND (3s)`. Cannot jump directly from PASSIVE to STAND. The MQTT client and REST API both enforce this transition sequence.
 
 **ROS2 Service:** `/aimdk_5Fmsgs/srv/SetMcAction`
 **Query:** `/aimdk_5Fmsgs/srv/GetMcAction`
@@ -338,7 +340,7 @@ Two custom systemd services run at `/home/run/x2_api/`:
 
 The REST API uses `ros2_bridge.py`, `motion_catalog.py`, and `config.py` directly. The MQTT client delegates all robot control to the REST API on `localhost:8080` (no direct ROS2 calls) — this avoids `rclpy.spin_until_future_complete` threading deadlocks. The MQTT client depends on the REST API and waits up to 30s for it at startup.
 
-**MQTT client key features:** REST API delegation, command queue (single worker thread), motion completion detection (polls state every 2s while dancing), adaptive heartbeat (10s idle / 2s dancing), LWT offline detection, auto-stand.
+**MQTT client key features:** REST API delegation, command queue (single worker thread), motion completion detection (polls state every 2s while dancing), adaptive heartbeat (10s idle / 2s dancing), LWT offline detection, safe auto-stand (PASSIVE → DAMPING → JOINT → STAND with settling time).
 
 ### WiFi / Network
 

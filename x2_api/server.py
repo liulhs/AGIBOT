@@ -2,6 +2,7 @@
 """X2 Motion REST API — Flask application entry point."""
 import os
 import sys
+import time
 import logging
 import atexit
 from flask import Flask, request, jsonify
@@ -143,10 +144,21 @@ def play_motion():
     state = bridge.get_mode()
     if state["mode"] != "STAND_DEFAULT":
         if auto_stand:
-            result = bridge.set_mode("STAND_DEFAULT")
-            if not result["success"]:
-                return jsonify({"error": "Failed to auto-stand", "detail": result["message"]}), 500
-            # Note: caller should wait a few seconds before the motion actually executes well
+            # Safe transition: PASSIVE → DAMPING → JOINT → STAND
+            # Cannot jump directly from PASSIVE to STAND.
+            stand_seq = [
+                ("DAMPING_DEFAULT", 2),
+                ("JOINT_DEFAULT", 2),
+                ("STAND_DEFAULT", 3),
+            ]
+            current = state["mode"]
+            mode_order = [s[0] for s in stand_seq]
+            start_idx = (mode_order.index(current) + 1) if current in mode_order else 0
+            for target, wait in stand_seq[start_idx:]:
+                result = bridge.set_mode(target)
+                if not result["success"]:
+                    return jsonify({"error": f"Auto-stand failed at {target}", "detail": result["message"]}), 500
+                time.sleep(wait)
         else:
             return jsonify({
                 "error": f"Robot must be in STAND_DEFAULT (currently: {state['mode']})",
@@ -167,6 +179,14 @@ def play_motion():
     result["motion_id"] = motion_id
     result["motion_name"] = motion["name"]
     return jsonify(result)
+
+
+@app.route("/api/v1/motions/registered", methods=["GET"])
+@require_api_key
+def list_registered_motions():
+    """List motions currently registered with MC (debug/diagnostic)."""
+    motions = bridge.list_registered_motions()
+    return jsonify({"count": len(motions), "motions": motions})
 
 
 @app.route("/api/v1/motions/stop", methods=["POST"])
